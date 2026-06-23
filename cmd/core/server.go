@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"os"
 
@@ -34,7 +34,7 @@ func server(ctx context.Context) error {
 	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		log.Printf("listening on %s", port)
+		slog.Info("listening", "port", port)
 		return grpcServer.Serve(lis)
 	})
 
