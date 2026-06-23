@@ -7,3 +7,4 @@ sql:
       go:
         package: "sqlc"
         out: "internal/core/db/sqlc"
+        sql_package: "pgx/v5"
