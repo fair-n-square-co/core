@@ -26,6 +26,8 @@ func server(ctx context.Context) error {
 		return fmt.Errorf("listen %s: %w", port, err)
 	}
 
+	// TODO: insecure transport is for local development only. Replace with TLS
+	// credentials (e.g. credentials.NewServerTLSFromFile) before production.
 	grpcServer := grpc.NewServer(grpc.Creds(insecure.NewCredentials()))
 	reflection.Register(grpcServer)
 
