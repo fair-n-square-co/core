@@ -5,67 +5,29 @@
 package sqlc
 
 import (
-	"database/sql/driver"
-	"fmt"
-
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type FriendStatus string
-
-const (
-	FriendStatusPending  FriendStatus = "pending"
-	FriendStatusAccepted FriendStatus = "accepted"
-	FriendStatusBlocked  FriendStatus = "blocked"
-)
-
-func (e *FriendStatus) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = FriendStatus(s)
-	case string:
-		*e = FriendStatus(s)
-	default:
-		return fmt.Errorf("unsupported scan type for FriendStatus: %T", src)
-	}
-	return nil
+type FriendEvent struct {
+	ID             pgtype.UUID
+	RelationshipID pgtype.UUID
+	ActorID        pgtype.UUID
+	Type           string
+	CreatedAt      pgtype.Timestamptz
 }
 
-type NullFriendStatus struct {
-	FriendStatus FriendStatus
-	Valid        bool // Valid is true if FriendStatus is not NULL
+type Relationship struct {
+	ID            pgtype.UUID
+	UserA         pgtype.UUID
+	UserB         pgtype.UUID
+	Status        string
+	StatusActorID pgtype.UUID
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
 }
 
-// Scan implements the Scanner interface.
-func (ns *NullFriendStatus) Scan(value interface{}) error {
-	if value == nil {
-		ns.FriendStatus, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.FriendStatus.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullFriendStatus) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.FriendStatus), nil
-}
-
-type Friend struct {
-	ID           pgtype.UUID
-	PersonaID1   pgtype.UUID
-	PersonaID2   pgtype.UUID
-	Status       FriendStatus
-	CreatedAt    pgtype.Timestamptz
-	UpdatedAt    pgtype.Timestamptz
-	NamePersona1 string
-	NamePersona2 string
-}
-
-type Persona struct {
-	ID        pgtype.UUID
-	CreatedAt pgtype.Timestamptz
+type User struct {
+	ID          pgtype.UUID
+	AuthSubject string
+	CreatedAt   pgtype.Timestamptz
 }
