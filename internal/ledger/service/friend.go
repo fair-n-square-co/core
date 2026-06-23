@@ -1,14 +1,14 @@
 package service
 
-// RelationshipStatus values mirror the CHECK constraint on relationship.status.
+// FriendshipStatus values mirror the CHECK constraint on friendship.status.
 // Stored as text in the database; defined here as constants for validation in the
 // service and api layers.
 const (
-	RelationshipStatusPending   = "pending"
-	RelationshipStatusAccepted  = "accepted"
-	RelationshipStatusRejected  = "rejected"
-	RelationshipStatusCancelled = "cancelled"
-	RelationshipStatusBlocked   = "blocked"
+	FriendshipStatusPending   = "pending"
+	FriendshipStatusAccepted  = "accepted"
+	FriendshipStatusRejected  = "rejected"
+	FriendshipStatusCancelled = "cancelled"
+	FriendshipStatusBlocked   = "blocked"
 )
 
 // FriendEventType values mirror the CHECK constraint on friend_event.type.
@@ -21,13 +21,13 @@ const (
 	FriendEventUnblocked = "unblocked"
 )
 
-// validRelationshipStatuses is the set of allowed relationship.status values.
-var validRelationshipStatuses = map[string]struct{}{
-	RelationshipStatusPending:   {},
-	RelationshipStatusAccepted:  {},
-	RelationshipStatusRejected:  {},
-	RelationshipStatusCancelled: {},
-	RelationshipStatusBlocked:   {},
+// validFriendshipStatuses is the set of allowed friendship.status values.
+var validFriendshipStatuses = map[string]struct{}{
+	FriendshipStatusPending:   {},
+	FriendshipStatusAccepted:  {},
+	FriendshipStatusRejected:  {},
+	FriendshipStatusCancelled: {},
+	FriendshipStatusBlocked:   {},
 }
 
 // validFriendEventTypes is the set of allowed friend_event.type values.
@@ -40,9 +40,9 @@ var validFriendEventTypes = map[string]struct{}{
 	FriendEventUnblocked: {},
 }
 
-// IsValidRelationshipStatus reports whether s is an allowed relationship status.
-func IsValidRelationshipStatus(s string) bool {
-	_, ok := validRelationshipStatuses[s]
+// IsValidFriendshipStatus reports whether s is an allowed friendship status.
+func IsValidFriendshipStatus(s string) bool {
+	_, ok := validFriendshipStatuses[s]
 	return ok
 }
 

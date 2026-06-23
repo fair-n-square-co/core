@@ -9,14 +9,14 @@ import (
 )
 
 type FriendEvent struct {
-	ID             pgtype.UUID
-	RelationshipID pgtype.UUID
-	ActorID        pgtype.UUID
-	Type           string
-	CreatedAt      pgtype.Timestamptz
+	ID           pgtype.UUID
+	FriendshipID pgtype.UUID
+	ActorID      pgtype.UUID
+	Type         string
+	CreatedAt    pgtype.Timestamptz
 }
 
-type Relationship struct {
+type Friendship struct {
 	ID            pgtype.UUID
 	UserA         pgtype.UUID
 	UserB         pgtype.UUID

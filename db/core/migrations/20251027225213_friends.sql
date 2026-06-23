@@ -8,7 +8,7 @@
 -- external auth subject, so we can leverage database features like ON DELETE CASCADE
 -- and own our keyspace independently of the auth provider.
 --
--- Friendships are modelled as a "relationship" (current state, one row per pair) plus
+-- Friendships are modelled as a "friendship" (current state, one row per pair) plus
 -- a "friend_event" append-only history. Direction is captured by status_actor_id (who
 -- caused the current state) and friend_event.actor_id (who performed each event).
 
@@ -30,10 +30,10 @@ CREATE TABLE "user" (
   created_at    timestamptz NOT NULL DEFAULT now()
 );
 
--- relationship holds the current state of a friendship between a pair of users.
+-- friendship holds the current state of a friendship between a pair of users.
 -- The pair is ordered once at creation (user_a < user_b) so each pair maps to exactly
 -- one row via a plain UNIQUE constraint -- no LEAST/GREATEST expression index needed.
-CREATE TABLE relationship (
+CREATE TABLE friendship (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_a          uuid NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
   user_b          uuid NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
@@ -47,38 +47,38 @@ CREATE TABLE relationship (
   CONSTRAINT unique_pair   UNIQUE (user_a, user_b)
 );
 
--- Indexes for listing a user's relationships filtered by status, in both pair positions.
-CREATE INDEX idx_relationship_user_a ON relationship (user_a, status);
-CREATE INDEX idx_relationship_user_b ON relationship (user_b, status);
+-- Indexes for listing a user's friendships filtered by status, in both pair positions.
+CREATE INDEX idx_friendship_user_a ON friendship (user_a, status);
+CREATE INDEX idx_friendship_user_b ON friendship (user_b, status);
 
 -- Trigger to automatically update updated_at on row update
-CREATE TRIGGER update_relationship_updated_at BEFORE UPDATE ON relationship
+CREATE TRIGGER update_friendship_updated_at BEFORE UPDATE ON friendship
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- friend_event is the append-only history of lifecycle events for a relationship.
+-- friend_event is the append-only history of lifecycle events for a friendship.
 CREATE TABLE friend_event (
-  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  relationship_id uuid NOT NULL REFERENCES relationship(id) ON DELETE CASCADE,
-  actor_id        uuid NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
-  type            text NOT NULL
-                    CHECK (type IN ('requested', 'accepted', 'rejected', 'cancelled', 'blocked', 'unblocked')),
-  created_at      timestamptz NOT NULL DEFAULT now()
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  friendship_id uuid NOT NULL REFERENCES friendship(id) ON DELETE CASCADE,
+  actor_id      uuid NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+  type          text NOT NULL
+                  CHECK (type IN ('requested', 'accepted', 'rejected', 'cancelled', 'blocked', 'unblocked')),
+  created_at    timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_friend_event_relationship ON friend_event (relationship_id, created_at);
+CREATE INDEX idx_friend_event_friendship ON friend_event (friendship_id, created_at);
 
 -- +goose StatementEnd
 
 -- +goose Down
 -- +goose StatementBegin
 
-DROP INDEX IF EXISTS idx_friend_event_relationship;
+DROP INDEX IF EXISTS idx_friend_event_friendship;
 DROP TABLE IF EXISTS friend_event;
 
-DROP TRIGGER IF EXISTS update_relationship_updated_at ON relationship;
-DROP INDEX IF EXISTS idx_relationship_user_b;
-DROP INDEX IF EXISTS idx_relationship_user_a;
-DROP TABLE IF EXISTS relationship;
+DROP TRIGGER IF EXISTS update_friendship_updated_at ON friendship;
+DROP INDEX IF EXISTS idx_friendship_user_b;
+DROP INDEX IF EXISTS idx_friendship_user_a;
+DROP TABLE IF EXISTS friendship;
 
 DROP TABLE IF EXISTS "user";
 
