@@ -25,31 +25,27 @@ func testUUID(b byte) pgtype.UUID {
 	return u
 }
 
-// assignable turns prototype pointers into AssignableToTypeOf matchers. Scan
-// destinations are pointers into the (unexported) row struct inside the
-// generated code, so their concrete values can't be known — we assert their
-// types instead.
-func assignable(ptrs ...any) []any {
-	matchers := make([]any, len(ptrs))
-	for i, p := range ptrs {
-		matchers[i] = gomock.AssignableToTypeOf(p)
-	}
-	return matchers
+// scanType returns an AssignableToTypeOf matcher for a Scan destination of
+// type T. Scan destinations are pointers into the (unexported) row struct
+// inside the generated code, so their concrete values can't be known — we
+// assert their types instead.
+func scanType[T any]() gomock.Matcher {
+	return gomock.AssignableToTypeOf(reflect.TypeFor[T]())
 }
 
 // Scan destination type signatures for each row shape.
 var (
-	userScan = assignable(
-		(*pgtype.UUID)(nil), (*string)(nil), (*pgtype.Timestamptz)(nil),
-	)
-	friendshipScan = assignable(
-		(*pgtype.UUID)(nil), (*pgtype.UUID)(nil), (*pgtype.UUID)(nil), (*string)(nil),
-		(*pgtype.UUID)(nil), (*pgtype.Timestamptz)(nil), (*pgtype.Timestamptz)(nil),
-	)
-	friendEventScan = assignable(
-		(*pgtype.UUID)(nil), (*pgtype.UUID)(nil), (*pgtype.UUID)(nil), (*string)(nil),
-		(*pgtype.Timestamptz)(nil),
-	)
+	userScan = []any{
+		scanType[*pgtype.UUID](), scanType[*string](), scanType[*pgtype.Timestamptz](),
+	}
+	friendshipScan = []any{
+		scanType[*pgtype.UUID](), scanType[*pgtype.UUID](), scanType[*pgtype.UUID](), scanType[*string](),
+		scanType[*pgtype.UUID](), scanType[*pgtype.Timestamptz](), scanType[*pgtype.Timestamptz](),
+	}
+	friendEventScan = []any{
+		scanType[*pgtype.UUID](), scanType[*pgtype.UUID](), scanType[*pgtype.UUID](), scanType[*string](),
+		scanType[*pgtype.Timestamptz](),
+	}
 )
 
 // scanReturn drives a mocked Scan: it assigns each provided value into the
