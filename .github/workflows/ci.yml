@@ -38,7 +38,7 @@ jobs:
           cache: true
 
       - name: Run tests
-        run: go test -race -covermode=atomic -coverprofile=cover.out ./...
+        run: go test -race -covermode=atomic -coverprofile=cover.out $(go list ./... | grep -v '/mocks$')
 
       - name: Coverage summary
         run: go tool cover -func=cover.out | tail -1
