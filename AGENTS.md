@@ -18,7 +18,7 @@ Guidance for Claude and other AI agents working in this repository.
 - `service/` — business logic and validation (e.g. allowed status values).
 - `repository/` — data access, using the sqlc-generated queries.
 
-Dependencies flow **api → service → repository** only. Do not import another module's internal packages; share through well-defined boundaries instead. Shared infrastructure (config, the DB connection, generated SQL) lives under `internal/core/`.
+Dependencies flow **api → service → repository** only. Do not import another module's internal packages; share through well-defined boundaries instead. Shared infrastructure (the DB connection pool, generated SQL, logging) lives under `internal/core/`. App config loading lives next to the entrypoint in `cmd/core/config/` (embedded YAML + `CORE_`-prefixed env overrides via viper).
 
 ### Database workflow
 

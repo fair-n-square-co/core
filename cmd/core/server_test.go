@@ -3,24 +3,24 @@ package main
 import (
 	"context"
 	"net"
+	"strconv"
 	"testing"
 	"time"
 
+	"github.com/fair-n-square-co/core/cmd/core/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// TestServer_GracefulShutdown starts the server on an ephemeral port (via the
-// PORT env var) and confirms it shuts down cleanly when the context is
-// cancelled, returning a nil error.
+// TestServer_GracefulShutdown starts the server on an ephemeral port and
+// confirms it shuts down cleanly when the context is cancelled, returning a nil
+// error.
 func TestServer_GracefulShutdown(t *testing.T) {
-	t.Setenv("PORT", "0")
-
 	ctx, cancel := context.WithCancel(context.Background())
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- server(ctx)
+		errCh <- server(ctx, &config.Config{Port: 0})
 	}()
 
 	// Give the server a moment to bind and start serving before cancelling.
@@ -46,10 +46,10 @@ func TestServer_ListenError(t *testing.T) {
 
 	_, portStr, err := net.SplitHostPort(lis.Addr().String())
 	require.NoError(t, err)
+	port, err := strconv.Atoi(portStr)
+	require.NoError(t, err)
 
-	t.Setenv("PORT", portStr)
-
-	err = server(context.Background())
+	err = server(context.Background(), &config.Config{Port: port})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "listen")
 }
