@@ -25,6 +25,33 @@ func testUUID(b byte) pgtype.UUID {
 	return u
 }
 
+// assignable turns prototype pointers into AssignableToTypeOf matchers. Scan
+// destinations are pointers into the (unexported) row struct inside the
+// generated code, so their concrete values can't be known — we assert their
+// types instead.
+func assignable(ptrs ...any) []any {
+	matchers := make([]any, len(ptrs))
+	for i, p := range ptrs {
+		matchers[i] = gomock.AssignableToTypeOf(p)
+	}
+	return matchers
+}
+
+// Scan destination type signatures for each row shape.
+var (
+	userScan = assignable(
+		(*pgtype.UUID)(nil), (*string)(nil), (*pgtype.Timestamptz)(nil),
+	)
+	friendshipScan = assignable(
+		(*pgtype.UUID)(nil), (*pgtype.UUID)(nil), (*pgtype.UUID)(nil), (*string)(nil),
+		(*pgtype.UUID)(nil), (*pgtype.Timestamptz)(nil), (*pgtype.Timestamptz)(nil),
+	)
+	friendEventScan = assignable(
+		(*pgtype.UUID)(nil), (*pgtype.UUID)(nil), (*pgtype.UUID)(nil), (*string)(nil),
+		(*pgtype.Timestamptz)(nil),
+	)
+)
+
 // scanReturn drives a mocked Scan: it assigns each provided value into the
 // matching destination pointer positionally, simulating a successful row read.
 func scanReturn(values ...any) func(dest ...any) error {
@@ -49,12 +76,13 @@ func TestNewAndWithTx(t *testing.T) {
 	assert.NotSame(t, q, got)
 }
 
-// rowMock wires a MockDBTX so QueryRow returns the given MockRow.
-func rowMock(t *testing.T) (*Queries, *mocks.MockRow) {
+// rowMock wires a MockDBTX so QueryRow, matched against the exact SQL and
+// args, returns the MockRow.
+func rowMock(t *testing.T, ctx context.Context, sql string, args ...any) (*Queries, *mocks.MockRow) {
 	ctrl := gomock.NewController(t)
 	db := mocks.NewMockDBTX(ctrl)
 	row := mocks.NewMockRow(ctrl)
-	db.EXPECT().QueryRow(gomock.Any(), gomock.Any(), gomock.Any()).Return(row)
+	db.EXPECT().QueryRow(ctx, sql, args...).Return(row)
 	return New(db), row
 }
 
@@ -62,59 +90,61 @@ func rowMock(t *testing.T) (*Queries, *mocks.MockRow) {
 
 func TestCreateFriendEvent(t *testing.T) {
 	ctx := context.Background()
+	params := CreateFriendEventParams{FriendshipID: testUUID(2), ActorID: testUUID(3), Type: "requested"}
 
 	t.Run("success", func(t *testing.T) {
 		id := testUUID(1)
-		q, row := rowMock(t)
-		row.EXPECT().Scan(gomock.Any()).DoAndReturn(
-			scanReturn(id, testUUID(2), testUUID(3), "requested", pgtype.Timestamptz{}))
+		q, row := rowMock(t, ctx, createFriendEvent, params.FriendshipID, params.ActorID, params.Type)
+		row.EXPECT().Scan(friendEventScan...).DoAndReturn(
+			scanReturn(id, params.FriendshipID, params.ActorID, params.Type, pgtype.Timestamptz{}))
 
-		got, err := q.CreateFriendEvent(ctx, CreateFriendEventParams{Type: "requested"})
+		got, err := q.CreateFriendEvent(ctx, params)
 		require.NoError(t, err)
 		assert.Equal(t, id, got.ID)
 		assert.Equal(t, "requested", got.Type)
 	})
 
 	t.Run("scan error", func(t *testing.T) {
-		q, row := rowMock(t)
-		row.EXPECT().Scan(gomock.Any()).Return(errBoom)
+		q, row := rowMock(t, ctx, createFriendEvent, params.FriendshipID, params.ActorID, params.Type)
+		row.EXPECT().Scan(friendEventScan...).Return(errBoom)
 
-		_, err := q.CreateFriendEvent(ctx, CreateFriendEventParams{})
+		_, err := q.CreateFriendEvent(ctx, params)
 		assert.ErrorIs(t, err, errBoom)
 	})
 }
 
 func TestCreateFriendship(t *testing.T) {
 	ctx := context.Background()
+	params := CreateFriendshipParams{UserA: testUUID(2), UserB: testUUID(3), Status: "pending", StatusActorID: testUUID(2)}
 
 	t.Run("success", func(t *testing.T) {
 		id := testUUID(1)
-		q, row := rowMock(t)
-		row.EXPECT().Scan(gomock.Any()).DoAndReturn(
-			scanReturn(id, testUUID(2), testUUID(3), "pending", testUUID(2), pgtype.Timestamptz{}, pgtype.Timestamptz{}))
+		q, row := rowMock(t, ctx, createFriendship, params.UserA, params.UserB, params.Status, params.StatusActorID)
+		row.EXPECT().Scan(friendshipScan...).DoAndReturn(
+			scanReturn(id, params.UserA, params.UserB, params.Status, params.StatusActorID, pgtype.Timestamptz{}, pgtype.Timestamptz{}))
 
-		got, err := q.CreateFriendship(ctx, CreateFriendshipParams{Status: "pending"})
+		got, err := q.CreateFriendship(ctx, params)
 		require.NoError(t, err)
 		assert.Equal(t, id, got.ID)
 		assert.Equal(t, "pending", got.Status)
 	})
 
 	t.Run("scan error", func(t *testing.T) {
-		q, row := rowMock(t)
-		row.EXPECT().Scan(gomock.Any()).Return(errBoom)
+		q, row := rowMock(t, ctx, createFriendship, params.UserA, params.UserB, params.Status, params.StatusActorID)
+		row.EXPECT().Scan(friendshipScan...).Return(errBoom)
 
-		_, err := q.CreateFriendship(ctx, CreateFriendshipParams{})
+		_, err := q.CreateFriendship(ctx, params)
 		assert.ErrorIs(t, err, errBoom)
 	})
 }
 
 func TestGetFriendshipByID(t *testing.T) {
 	ctx := context.Background()
+	id := testUUID(7)
 
 	t.Run("success", func(t *testing.T) {
-		id := testUUID(7)
-		q, row := rowMock(t)
-		row.EXPECT().Scan(gomock.Any()).DoAndReturn(
+		q, row := rowMock(t, ctx, getFriendshipByID, id)
+		row.EXPECT().Scan(friendshipScan...).DoAndReturn(
 			scanReturn(id, testUUID(2), testUUID(3), "accepted", testUUID(2), pgtype.Timestamptz{}, pgtype.Timestamptz{}))
 
 		got, err := q.GetFriendshipByID(ctx, id)
@@ -124,79 +154,81 @@ func TestGetFriendshipByID(t *testing.T) {
 	})
 
 	t.Run("not found", func(t *testing.T) {
-		q, row := rowMock(t)
-		row.EXPECT().Scan(gomock.Any()).Return(pgx.ErrNoRows)
+		q, row := rowMock(t, ctx, getFriendshipByID, id)
+		row.EXPECT().Scan(friendshipScan...).Return(pgx.ErrNoRows)
 
-		_, err := q.GetFriendshipByID(ctx, testUUID(7))
+		_, err := q.GetFriendshipByID(ctx, id)
 		assert.ErrorIs(t, err, pgx.ErrNoRows)
 	})
 }
 
 func TestGetFriendshipByPair(t *testing.T) {
 	ctx := context.Background()
+	params := GetFriendshipByPairParams{UserA: testUUID(2), UserB: testUUID(3)}
 
 	t.Run("success", func(t *testing.T) {
 		id := testUUID(9)
-		q, row := rowMock(t)
-		row.EXPECT().Scan(gomock.Any()).DoAndReturn(
-			scanReturn(id, testUUID(2), testUUID(3), "blocked", testUUID(2), pgtype.Timestamptz{}, pgtype.Timestamptz{}))
+		q, row := rowMock(t, ctx, getFriendshipByPair, params.UserA, params.UserB)
+		row.EXPECT().Scan(friendshipScan...).DoAndReturn(
+			scanReturn(id, params.UserA, params.UserB, "blocked", testUUID(2), pgtype.Timestamptz{}, pgtype.Timestamptz{}))
 
-		got, err := q.GetFriendshipByPair(ctx, GetFriendshipByPairParams{UserA: testUUID(2), UserB: testUUID(3)})
+		got, err := q.GetFriendshipByPair(ctx, params)
 		require.NoError(t, err)
 		assert.Equal(t, id, got.ID)
 	})
 
 	t.Run("scan error", func(t *testing.T) {
-		q, row := rowMock(t)
-		row.EXPECT().Scan(gomock.Any()).Return(errBoom)
+		q, row := rowMock(t, ctx, getFriendshipByPair, params.UserA, params.UserB)
+		row.EXPECT().Scan(friendshipScan...).Return(errBoom)
 
-		_, err := q.GetFriendshipByPair(ctx, GetFriendshipByPairParams{})
+		_, err := q.GetFriendshipByPair(ctx, params)
 		assert.ErrorIs(t, err, errBoom)
 	})
 }
 
 func TestUpdateFriendshipStatus(t *testing.T) {
 	ctx := context.Background()
+	params := UpdateFriendshipStatusParams{ID: testUUID(4), Status: "cancelled", StatusActorID: testUUID(2)}
 
 	t.Run("success", func(t *testing.T) {
-		id := testUUID(4)
-		q, row := rowMock(t)
-		row.EXPECT().Scan(gomock.Any()).DoAndReturn(
-			scanReturn(id, testUUID(2), testUUID(3), "cancelled", testUUID(2), pgtype.Timestamptz{}, pgtype.Timestamptz{}))
+		q, row := rowMock(t, ctx, updateFriendshipStatus, params.ID, params.Status, params.StatusActorID)
+		row.EXPECT().Scan(friendshipScan...).DoAndReturn(
+			scanReturn(params.ID, testUUID(2), testUUID(3), params.Status, params.StatusActorID, pgtype.Timestamptz{}, pgtype.Timestamptz{}))
 
-		got, err := q.UpdateFriendshipStatus(ctx, UpdateFriendshipStatusParams{ID: id, Status: "cancelled"})
+		got, err := q.UpdateFriendshipStatus(ctx, params)
 		require.NoError(t, err)
 		assert.Equal(t, "cancelled", got.Status)
 	})
 
 	t.Run("scan error", func(t *testing.T) {
-		q, row := rowMock(t)
-		row.EXPECT().Scan(gomock.Any()).Return(errBoom)
+		q, row := rowMock(t, ctx, updateFriendshipStatus, params.ID, params.Status, params.StatusActorID)
+		row.EXPECT().Scan(friendshipScan...).Return(errBoom)
 
-		_, err := q.UpdateFriendshipStatus(ctx, UpdateFriendshipStatusParams{})
+		_, err := q.UpdateFriendshipStatus(ctx, params)
 		assert.ErrorIs(t, err, errBoom)
 	})
 }
 
 func TestCreateUser(t *testing.T) {
 	ctx := context.Background()
+	const authSubject = "auth-subject"
 
 	t.Run("success", func(t *testing.T) {
 		id := testUUID(1)
-		q, row := rowMock(t)
-		row.EXPECT().Scan(gomock.Any()).DoAndReturn(scanReturn(id, "auth-subject", pgtype.Timestamptz{}))
+		q, row := rowMock(t, ctx, createUser, authSubject)
+		row.EXPECT().Scan(userScan...).DoAndReturn(scanReturn(id, authSubject, pgtype.Timestamptz{}))
 
-		got, err := q.CreateUser(ctx, "auth-subject")
+		got, err := q.CreateUser(ctx, authSubject)
 		require.NoError(t, err)
 		assert.Equal(t, id, got.ID)
-		assert.Equal(t, "auth-subject", got.AuthSubject)
+		assert.Equal(t, authSubject, got.AuthSubject)
 	})
 
 	t.Run("scan error", func(t *testing.T) {
-		q, row := rowMock(t)
-		row.EXPECT().Scan(gomock.Any()).Return(errBoom)
+		q, row := rowMock(t, ctx, createUser, authSubject)
+		row.EXPECT().Scan(userScan...).Return(errBoom)
 
-		_, err := q.CreateUser(ctx, "auth-subject")
+		_, err := q.CreateUser(ctx, authSubject)
 		assert.ErrorIs(t, err, errBoom)
 	})
 }
@@ -205,8 +237,8 @@ func TestGetUserByAuthSubject(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("success", func(t *testing.T) {
-		q, row := rowMock(t)
-		row.EXPECT().Scan(gomock.Any()).DoAndReturn(scanReturn(testUUID(1), "subject-a", pgtype.Timestamptz{}))
+		q, row := rowMock(t, ctx, getUserByAuthSubject, "subject-a")
+		row.EXPECT().Scan(userScan...).DoAndReturn(scanReturn(testUUID(1), "subject-a", pgtype.Timestamptz{}))
 
 		got, err := q.GetUserByAuthSubject(ctx, "subject-a")
 		require.NoError(t, err)
@@ -214,8 +246,8 @@ func TestGetUserByAuthSubject(t *testing.T) {
 	})
 
 	t.Run("not found", func(t *testing.T) {
-		q, row := rowMock(t)
-		row.EXPECT().Scan(gomock.Any()).Return(pgx.ErrNoRows)
+		q, row := rowMock(t, ctx, getUserByAuthSubject, "missing")
+		row.EXPECT().Scan(userScan...).Return(pgx.ErrNoRows)
 
 		_, err := q.GetUserByAuthSubject(ctx, "missing")
 		assert.ErrorIs(t, err, pgx.ErrNoRows)
@@ -224,11 +256,11 @@ func TestGetUserByAuthSubject(t *testing.T) {
 
 func TestGetUserByID(t *testing.T) {
 	ctx := context.Background()
+	id := testUUID(5)
 
 	t.Run("success", func(t *testing.T) {
-		id := testUUID(5)
-		q, row := rowMock(t)
-		row.EXPECT().Scan(gomock.Any()).DoAndReturn(scanReturn(id, "subject-b", pgtype.Timestamptz{}))
+		q, row := rowMock(t, ctx, getUserByID, id)
+		row.EXPECT().Scan(userScan...).DoAndReturn(scanReturn(id, "subject-b", pgtype.Timestamptz{}))
 
 		got, err := q.GetUserByID(ctx, id)
 		require.NoError(t, err)
@@ -236,10 +268,10 @@ func TestGetUserByID(t *testing.T) {
 	})
 
 	t.Run("scan error", func(t *testing.T) {
-		q, row := rowMock(t)
-		row.EXPECT().Scan(gomock.Any()).Return(errBoom)
+		q, row := rowMock(t, ctx, getUserByID, id)
+		row.EXPECT().Scan(userScan...).Return(errBoom)
 
-		_, err := q.GetUserByID(ctx, testUUID(5))
+		_, err := q.GetUserByID(ctx, id)
 		assert.ErrorIs(t, err, errBoom)
 	})
 }
@@ -247,15 +279,16 @@ func TestGetUserByID(t *testing.T) {
 // --- Query-based (:many) queries: cover query error, scan error, row error
 // and the happy path. ---
 
-// rowsMock wires a MockDBTX so Query returns the given MockRows (or an error).
-func rowsMock(t *testing.T, queryErr error) (*Queries, *mocks.MockRows) {
+// rowsMock wires a MockDBTX so Query, matched against the exact SQL and args,
+// returns the MockRows (or an error).
+func rowsMock(t *testing.T, ctx context.Context, queryErr error, sql string, args ...any) (*Queries, *mocks.MockRows) {
 	ctrl := gomock.NewController(t)
 	db := mocks.NewMockDBTX(ctrl)
 	rows := mocks.NewMockRows(ctrl)
 	if queryErr != nil {
-		db.EXPECT().Query(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, queryErr)
+		db.EXPECT().Query(ctx, sql, args...).Return(nil, queryErr)
 	} else {
-		db.EXPECT().Query(gomock.Any(), gomock.Any(), gomock.Any()).Return(rows, nil)
+		db.EXPECT().Query(ctx, sql, args...).Return(rows, nil)
 	}
 	return New(db), rows
 }
@@ -265,18 +298,18 @@ func TestListEventsForFriendship(t *testing.T) {
 	fid := testUUID(2)
 
 	t.Run("query error", func(t *testing.T) {
-		q, _ := rowsMock(t, errBoom)
+		q, _ := rowsMock(t, ctx, errBoom, listEventsForFriendship, fid)
 		_, err := q.ListEventsForFriendship(ctx, fid)
 		assert.ErrorIs(t, err, errBoom)
 	})
 
 	t.Run("success with rows", func(t *testing.T) {
-		q, rows := rowsMock(t, nil)
+		q, rows := rowsMock(t, ctx, nil, listEventsForFriendship, fid)
 		gomock.InOrder(
 			rows.EXPECT().Next().Return(true),
-			rows.EXPECT().Scan(gomock.Any()).DoAndReturn(scanReturn(testUUID(1), fid, testUUID(3), "requested", pgtype.Timestamptz{})),
+			rows.EXPECT().Scan(friendEventScan...).DoAndReturn(scanReturn(testUUID(1), fid, testUUID(3), "requested", pgtype.Timestamptz{})),
 			rows.EXPECT().Next().Return(true),
-			rows.EXPECT().Scan(gomock.Any()).DoAndReturn(scanReturn(testUUID(2), fid, testUUID(3), "accepted", pgtype.Timestamptz{})),
+			rows.EXPECT().Scan(friendEventScan...).DoAndReturn(scanReturn(testUUID(2), fid, testUUID(3), "accepted", pgtype.Timestamptz{})),
 			rows.EXPECT().Next().Return(false),
 			rows.EXPECT().Err().Return(nil),
 		)
@@ -290,9 +323,9 @@ func TestListEventsForFriendship(t *testing.T) {
 	})
 
 	t.Run("scan error", func(t *testing.T) {
-		q, rows := rowsMock(t, nil)
+		q, rows := rowsMock(t, ctx, nil, listEventsForFriendship, fid)
 		rows.EXPECT().Next().Return(true)
-		rows.EXPECT().Scan(gomock.Any()).Return(errBoom)
+		rows.EXPECT().Scan(friendEventScan...).Return(errBoom)
 		rows.EXPECT().Close()
 
 		_, err := q.ListEventsForFriendship(ctx, fid)
@@ -300,7 +333,7 @@ func TestListEventsForFriendship(t *testing.T) {
 	})
 
 	t.Run("rows error", func(t *testing.T) {
-		q, rows := rowsMock(t, nil)
+		q, rows := rowsMock(t, ctx, nil, listEventsForFriendship, fid)
 		gomock.InOrder(
 			rows.EXPECT().Next().Return(false),
 			rows.EXPECT().Err().Return(errBoom),
@@ -314,49 +347,49 @@ func TestListEventsForFriendship(t *testing.T) {
 
 func TestListFriendshipsForUser(t *testing.T) {
 	ctx := context.Background()
-	uid := testUUID(2)
+	params := ListFriendshipsForUserParams{UserA: testUUID(2)}
 
 	t.Run("query error", func(t *testing.T) {
-		q, _ := rowsMock(t, errBoom)
-		_, err := q.ListFriendshipsForUser(ctx, ListFriendshipsForUserParams{UserA: uid})
+		q, _ := rowsMock(t, ctx, errBoom, listFriendshipsForUser, params.UserA, params.Status)
+		_, err := q.ListFriendshipsForUser(ctx, params)
 		assert.ErrorIs(t, err, errBoom)
 	})
 
 	t.Run("success with rows", func(t *testing.T) {
-		q, rows := rowsMock(t, nil)
+		q, rows := rowsMock(t, ctx, nil, listFriendshipsForUser, params.UserA, params.Status)
 		gomock.InOrder(
 			rows.EXPECT().Next().Return(true),
-			rows.EXPECT().Scan(gomock.Any()).DoAndReturn(scanReturn(testUUID(1), uid, testUUID(3), "pending", uid, pgtype.Timestamptz{}, pgtype.Timestamptz{})),
+			rows.EXPECT().Scan(friendshipScan...).DoAndReturn(scanReturn(testUUID(1), params.UserA, testUUID(3), "pending", params.UserA, pgtype.Timestamptz{}, pgtype.Timestamptz{})),
 			rows.EXPECT().Next().Return(false),
 			rows.EXPECT().Err().Return(nil),
 		)
 		rows.EXPECT().Close()
 
-		got, err := q.ListFriendshipsForUser(ctx, ListFriendshipsForUserParams{UserA: uid})
+		got, err := q.ListFriendshipsForUser(ctx, params)
 		require.NoError(t, err)
 		require.Len(t, got, 1)
 		assert.Equal(t, "pending", got[0].Status)
 	})
 
 	t.Run("scan error", func(t *testing.T) {
-		q, rows := rowsMock(t, nil)
+		q, rows := rowsMock(t, ctx, nil, listFriendshipsForUser, params.UserA, params.Status)
 		rows.EXPECT().Next().Return(true)
-		rows.EXPECT().Scan(gomock.Any()).Return(errBoom)
+		rows.EXPECT().Scan(friendshipScan...).Return(errBoom)
 		rows.EXPECT().Close()
 
-		_, err := q.ListFriendshipsForUser(ctx, ListFriendshipsForUserParams{UserA: uid})
+		_, err := q.ListFriendshipsForUser(ctx, params)
 		assert.ErrorIs(t, err, errBoom)
 	})
 
 	t.Run("rows error", func(t *testing.T) {
-		q, rows := rowsMock(t, nil)
+		q, rows := rowsMock(t, ctx, nil, listFriendshipsForUser, params.UserA, params.Status)
 		gomock.InOrder(
 			rows.EXPECT().Next().Return(false),
 			rows.EXPECT().Err().Return(errBoom),
 		)
 		rows.EXPECT().Close()
 
-		_, err := q.ListFriendshipsForUser(ctx, ListFriendshipsForUserParams{UserA: uid})
+		_, err := q.ListFriendshipsForUser(ctx, params)
 		assert.ErrorIs(t, err, errBoom)
 	})
 }
