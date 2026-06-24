@@ -10,7 +10,7 @@ run: build
 
 test:
     @echo "Running tests..."
-    go test -race -covermode=atomic -coverprofile=cover.out -v ./...
+    go test -race -covermode=atomic -coverprofile=cover.out -v $(go list ./... | grep -v '/mocks$')
     @echo "Done."
 
 test-coverage: test
@@ -39,4 +39,6 @@ migrate-db:
 generate:
     @echo "Generating sqlc..."
     sqlc generate
+    @echo "Generating mocks..."
+    go generate ./...
     @echo "Done."
