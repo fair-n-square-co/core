@@ -18,6 +18,12 @@ test-coverage: test
     go tool cover -html=cover.out
     @echo "Done."
 
+# Integration tests spin a real Postgres via testcontainers (requires Docker).
+test-integration:
+    @echo "Running integration tests..."
+    go test -tags integration -race -count=1 ./cmd/core/...
+    @echo "Done."
+
 lint:
     @echo "Linting..."
     golangci-lint run ./...

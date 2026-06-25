@@ -24,8 +24,8 @@ func main() {
 
 	logger.InitLogger(&cfg.Logger)
 
-	// Establish the connection pool up front so a bad DSN fails fast. The pool
-	// is ready to inject into module repositories once they exist (FNS-87).
+	// Establish the connection pool up front so a bad DSN fails fast, then
+	// inject it into the server, which wires it through to module repositories.
 	pool, err := db.NewPool(ctx, cfg.Db)
 	if err != nil {
 		slog.Error("failed to init db pool", "error", err)
@@ -33,7 +33,7 @@ func main() {
 	}
 	defer pool.Close()
 
-	if err := server(ctx, cfg); err != nil {
+	if err := server(ctx, cfg, pool); err != nil {
 		slog.Error("server exited", "error", err)
 		os.Exit(1)
 	}
