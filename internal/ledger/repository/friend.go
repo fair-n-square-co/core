@@ -49,10 +49,22 @@ func (r *Repository) ListFriendshipsForUser(ctx context.Context, userID string) 
 
 	friendships := make([]Friendship, 0, len(rows))
 	for _, row := range rows {
+		id, err := fromPgUUID(row.ID)
+		if err != nil {
+			return nil, fmt.Errorf("decode friendship id: %w", err)
+		}
+		userA, err := fromPgUUID(row.UserA)
+		if err != nil {
+			return nil, fmt.Errorf("decode user_a: %w", err)
+		}
+		userB, err := fromPgUUID(row.UserB)
+		if err != nil {
+			return nil, fmt.Errorf("decode user_b: %w", err)
+		}
 		friendships = append(friendships, Friendship{
-			ID:     fromPgUUID(row.ID),
-			UserA:  fromPgUUID(row.UserA),
-			UserB:  fromPgUUID(row.UserB),
+			ID:     id,
+			UserA:  userA,
+			UserB:  userB,
 			Status: row.Status,
 		})
 	}
@@ -68,12 +80,17 @@ func toPgUUID(s string) (pgtype.UUID, error) {
 	return u, nil
 }
 
-// fromPgUUID renders a pgtype.UUID as its canonical string, or "" if invalid.
-func fromPgUUID(u pgtype.UUID) string {
+// fromPgUUID renders a pgtype.UUID as its canonical string. It errors rather
+// than silently emitting "" so bad/NULL row data surfaces as a repository
+// error instead of an apparently valid friendship with a blank id.
+func fromPgUUID(u pgtype.UUID) (string, error) {
 	v, err := u.Value()
 	if err != nil {
-		return ""
+		return "", err
 	}
-	s, _ := v.(string)
-	return s
+	s, ok := v.(string)
+	if !ok {
+		return "", fmt.Errorf("unexpected uuid value %T (NULL or invalid)", v)
+	}
+	return s, nil
 }

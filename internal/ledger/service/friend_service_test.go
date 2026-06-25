@@ -30,6 +30,18 @@ func TestFriendService_ListFriends_EmptyUser(t *testing.T) {
 	assert.Nil(t, got)
 }
 
+func TestFriendService_ListFriends_MalformedUser(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	repo := mocks.NewMockRepository(ctrl)
+	// The repository must never be queried for a malformed caller id.
+
+	svc := service.NewFriendService(repo)
+	got, err := svc.ListFriends(context.Background(), "not-a-uuid")
+
+	require.ErrorIs(t, err, service.ErrInvalidUser)
+	assert.Nil(t, got)
+}
+
 func TestFriendService_ListFriends_ResolvesOtherParticipant(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	repo := mocks.NewMockRepository(ctrl)

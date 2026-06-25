@@ -14,7 +14,7 @@ Guidance for Claude and other AI agents working in this repository.
 
 `core` is a modular monolith. Each domain lives under `internal/<module>/` and is split into three layers:
 
-- `api/` — gRPC handlers; translates protobuf requests to/from the service layer.
+- `api/` — connectRPC handlers; translate protobuf requests to/from the service layer.
 - `service/` — business logic and validation (e.g. allowed status values).
 - `repository/` — data access, using the sqlc-generated queries.
 

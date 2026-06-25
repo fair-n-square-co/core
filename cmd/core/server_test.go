@@ -19,7 +19,7 @@ import (
 // TestServe_GracefulShutdown starts serve on an ephemeral port and confirms it
 // returns nil once the context is cancelled.
 func TestServe_GracefulShutdown(t *testing.T) {
-	lis, err := net.Listen("tcp", ":0")
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 
 	srv := newHTTPServer(http.NewServeMux())
@@ -87,7 +87,7 @@ func TestNewHTTPServer_ServesCleartextHTTP2(t *testing.T) {
 // error from Serve (here, a listener closed out from under it) instead of
 // swallowing it.
 func TestServe_PropagatesServeError(t *testing.T) {
-	lis, err := net.Listen("tcp", ":0")
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	require.NoError(t, lis.Close()) // Serve will fail immediately on a closed listener.
 

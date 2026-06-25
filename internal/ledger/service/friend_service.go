@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 
+	"github.com/google/uuid"
+
 	"github.com/fair-n-square-co/core/internal/ledger/repository"
 )
 
 // ErrInvalidUser is returned when a friend operation is attempted without a
-// valid caller identity.
+// valid caller identity (a missing or malformed user id).
 var ErrInvalidUser = errors.New("invalid user id")
 
 // Repository is the data-access surface the friend service depends on. It is an
@@ -40,7 +42,10 @@ func NewFriendService(repo Repository) *FriendService {
 // ListFriends returns the friendships for userID, each resolved to the other
 // participant from userID's point of view.
 func (s *FriendService) ListFriends(ctx context.Context, userID string) ([]Friend, error) {
-	if userID == "" {
+	// Validate the caller id here (not in the repository) so malformed input is
+	// a caller error (4xx) rather than an internal one. Catches both the empty
+	// and the malformed-UUID cases.
+	if _, err := uuid.Parse(userID); err != nil {
 		return nil, ErrInvalidUser
 	}
 
