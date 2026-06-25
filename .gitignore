@@ -3,3 +3,6 @@
 
 # Test/coverage artifacts
 cover.out
+
+# Local environment / secrets
+.env

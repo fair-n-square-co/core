@@ -3,9 +3,12 @@ package db
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+const pingTimeout = 5 * time.Second
 
 // DBConfig holds database connection settings. It is composed into the
 // application config and passed to NewPool after loading.
@@ -21,7 +24,9 @@ func NewPool(ctx context.Context, c DBConfig) (*pgxpool.Pool, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create db pool: %w", err)
 	}
-	if err := pool.Ping(ctx); err != nil {
+	pingCtx, cancel := context.WithTimeout(ctx, pingTimeout)
+	defer cancel()
+	if err := pool.Ping(pingCtx); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("ping db: %w", err)
 	}

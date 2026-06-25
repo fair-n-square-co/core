@@ -5,13 +5,13 @@ services:
     volumes:
       - db_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: core
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-core}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 1s
       timeout: 30s
       retries: 3
@@ -21,7 +21,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      CORE_DB_CONNSTRING: "postgres://postgres:postgres@db:5432/core?sslmode=disable"
+      CORE_DB_CONNSTRING: ${CORE_DB_CONNSTRING:?CORE_DB_CONNSTRING is required}
     depends_on:
       db:
         condition: service_healthy
