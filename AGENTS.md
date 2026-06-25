@@ -14,7 +14,7 @@ Guidance for Claude and other AI agents working in this repository.
 
 `core` is a modular monolith. Each domain lives under `internal/<module>/` and is split into three layers:
 
-- `api/` — gRPC handlers; translates protobuf requests to/from the service layer.
+- `api/` — connectRPC handlers; translate protobuf requests to/from the service layer.
 - `service/` — business logic and validation (e.g. allowed status values).
 - `repository/` — data access, using the sqlc-generated queries.
 
@@ -33,9 +33,14 @@ Use the `just` recipes rather than ad-hoc commands:
 
 - `just build` — compile (`./cmd/core`).
 - `just test` — run tests with the race detector and coverage.
+- `just test-integration` — run the `integration`-tagged tests, which spin a real Postgres via testcontainers (requires Docker).
 - `just lint` — run `golangci-lint`; keep it at **0 issues** before committing.
-- `just generate` — regenerate sqlc code.
+- `just generate` — regenerate sqlc code and mocks.
 - `just migrate-db` — apply migrations (expects `DATABASE_URL`).
+
+### Transport
+
+The server speaks connectRPC over connect-go (Connect + gRPC + gRPC-Web on one port, cleartext HTTP/2 for local dev). Handlers implement the generated `…connect` handler interfaces from `apis`. gRPC health and reflection are registered alongside each service. Shared logging and panic-recovery interceptors live in `pkg/middleware`. Until auth lands (FNS-96), the caller's user id is read from the temporary `X-User-Id` header.
 
 ### Conventions
 

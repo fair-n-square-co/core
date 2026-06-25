@@ -1,0 +1,96 @@
+// Package repository owns data access for the ledger module, wrapping the
+// sqlc-generated queries and translating between database (pgtype) values and
+// the plain Go types the service layer consumes.
+package repository
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/jackc/pgx/v5/pgtype"
+
+	"github.com/fair-n-square-co/core/internal/core/db/sqlc"
+)
+
+// Friendship is the repository-level view of a friendship row. Identifiers are
+// canonical UUID strings so layers above never depend on pgtype.
+type Friendship struct {
+	ID     string
+	UserA  string
+	UserB  string
+	Status string
+}
+
+// Repository provides ledger data access backed by the sqlc query layer.
+type Repository struct {
+	q *sqlc.Queries
+}
+
+// New builds a Repository over any sqlc.DBTX (e.g. a *pgxpool.Pool).
+func New(db sqlc.DBTX) *Repository {
+	return &Repository{q: sqlc.New(db)}
+}
+
+// ListFriendshipsForUser returns every friendship the given user participates
+// in, regardless of status, newest first.
+func (r *Repository) ListFriendshipsForUser(ctx context.Context, userID string) ([]Friendship, error) {
+	uid, err := toPgUUID(userID)
+	if err != nil {
+		return nil, fmt.Errorf("parse user id: %w", err)
+	}
+
+	rows, err := r.q.ListFriendshipsForUser(ctx, sqlc.ListFriendshipsForUserParams{
+		UserA:  uid,
+		Status: pgtype.Text{}, // NULL -> no status filter
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list friendships: %w", err)
+	}
+
+	friendships := make([]Friendship, 0, len(rows))
+	for _, row := range rows {
+		id, err := fromPgUUID(row.ID)
+		if err != nil {
+			return nil, fmt.Errorf("decode friendship id: %w", err)
+		}
+		userA, err := fromPgUUID(row.UserA)
+		if err != nil {
+			return nil, fmt.Errorf("decode user_a: %w", err)
+		}
+		userB, err := fromPgUUID(row.UserB)
+		if err != nil {
+			return nil, fmt.Errorf("decode user_b: %w", err)
+		}
+		friendships = append(friendships, Friendship{
+			ID:     id,
+			UserA:  userA,
+			UserB:  userB,
+			Status: row.Status,
+		})
+	}
+	return friendships, nil
+}
+
+// toPgUUID parses a canonical UUID string into a pgtype.UUID.
+func toPgUUID(s string) (pgtype.UUID, error) {
+	var u pgtype.UUID
+	if err := u.Scan(s); err != nil {
+		return pgtype.UUID{}, err
+	}
+	return u, nil
+}
+
+// fromPgUUID renders a pgtype.UUID as its canonical string. It errors rather
+// than silently emitting "" so bad/NULL row data surfaces as a repository
+// error instead of an apparently valid friendship with a blank id.
+func fromPgUUID(u pgtype.UUID) (string, error) {
+	v, err := u.Value()
+	if err != nil {
+		return "", err
+	}
+	s, ok := v.(string)
+	if !ok {
+		return "", fmt.Errorf("unexpected uuid value %T (NULL or invalid)", v)
+	}
+	return s, nil
+}
