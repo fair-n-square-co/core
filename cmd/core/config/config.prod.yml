@@ -4,3 +4,8 @@ logger:
   format: json
 db:
   connString: ""
+  maxConns: 20
+  minConns: 5
+  maxConnLifetime: 1h
+  maxConnIdleTime: 30m
+  healthCheckPeriod: 1m

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/fair-n-square-co/core/internal/core/db"
 	"github.com/fair-n-square-co/core/internal/core/logger"
@@ -34,6 +35,13 @@ func LoadConfig() (*Config, error) {
 		Logger: logger.LogConfig{
 			Level:  slog.LevelInfo,
 			Format: "json",
+		},
+		Db: db.DBConfig{
+			MaxConns:          10,
+			MinConns:          2,
+			MaxConnLifetime:   time.Hour,
+			MaxConnIdleTime:   30 * time.Minute,
+			HealthCheckPeriod: time.Minute,
 		},
 	}
 
