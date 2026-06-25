@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
-	"os"
 
 	ledgerpb "github.com/fair-n-square-co/apis/gen/pkg/fairnsquare/service/ledger/v1alpha1"
+	"github.com/fair-n-square-co/core/cmd/core/config"
 	"github.com/fair-n-square-co/core/internal/ledger/api"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
@@ -15,15 +15,12 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-func server(ctx context.Context) error {
-	port := ":8080"
-	if envPort := os.Getenv("PORT"); envPort != "" {
-		port = ":" + envPort
-	}
+func server(ctx context.Context, cfg *config.Config) error {
+	addr := fmt.Sprintf(":%d", cfg.Port)
 
-	lis, err := net.Listen("tcp", port)
+	lis, err := net.Listen("tcp", addr)
 	if err != nil {
-		return fmt.Errorf("listen %s: %w", port, err)
+		return fmt.Errorf("listen %s: %w", addr, err)
 	}
 
 	// TODO: insecure transport is for local development only. Replace with TLS
@@ -36,7 +33,7 @@ func server(ctx context.Context) error {
 	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		slog.Info("listening", "port", port)
+		slog.Info("listening", "port", cfg.Port)
 		return grpcServer.Serve(lis)
 	})
 

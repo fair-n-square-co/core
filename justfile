@@ -36,6 +36,19 @@ migrate-db:
     goose -dir db/core/migrations postgres "$DATABASE_URL" up
     @echo "Done."
 
+docker-build:
+    @echo "Building docker image..."
+    docker build -t core .
+    @echo "Done."
+
+docker-up:
+    @echo "Starting services..."
+    docker compose up --build
+
+docker-down:
+    @echo "Stopping services..."
+    docker compose down
+
 generate:
     @echo "Generating sqlc..."
     sqlc generate

@@ -1,0 +1,30 @@
+services:
+  db:
+    image: postgres:17
+    restart: always
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-core}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 1s
+      timeout: 30s
+      retries: 3
+
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      CORE_DB_CONNSTRING: ${CORE_DB_CONNSTRING:?CORE_DB_CONNSTRING is required}
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db_data:
