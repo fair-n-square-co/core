@@ -16,18 +16,22 @@ services:
       timeout: 30s
       retries: 3
 
+  # One-shot: applies migrations, then exits. Mirrors the two-step CD flow.
   migrate:
     build:
       context: .
-      target: migrate
+      dockerfile: Dockerfile.migrate
+    command: ["up"]
     environment:
-      CORE_DB_CONNSTRING: ${CORE_DB_CONNSTRING:?CORE_DB_CONNSTRING is required}
+      GOOSE_DBSTRING: ${CORE_DB_CONNSTRING:?CORE_DB_CONNSTRING is required}
     depends_on:
       db:
         condition: service_healthy
 
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.core
     ports:
       - "8080:8080"
     environment:
