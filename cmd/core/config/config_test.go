@@ -2,6 +2,7 @@ package config
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,6 +18,13 @@ func TestLoadConfig_Defaults(t *testing.T) {
 	assert.Equal(t, 8080, cfg.Port)
 	assert.Equal(t, "json", cfg.Logger.Format)
 	assert.Empty(t, cfg.Db.ConnString)
+
+	// Connection pool tuning is resolved from the embedded YAML defaults.
+	assert.Equal(t, int32(10), cfg.Db.MaxConns)
+	assert.Equal(t, int32(2), cfg.Db.MinConns)
+	assert.Equal(t, time.Hour, cfg.Db.MaxConnLifetime)
+	assert.Equal(t, 30*time.Minute, cfg.Db.MaxConnIdleTime)
+	assert.Equal(t, time.Minute, cfg.Db.HealthCheckPeriod)
 }
 
 // TestLoadConfig_EnvOverrides verifies the env pass overrides YAML values,
@@ -26,6 +34,8 @@ func TestLoadConfig_EnvOverrides(t *testing.T) {
 	t.Setenv("CORE_PORT", "9090")
 	t.Setenv("CORE_LOGGER_FORMAT", "text")
 	t.Setenv("CORE_DB_CONNSTRING", "postgres://user:pass@host:5432/core?sslmode=disable")
+	t.Setenv("CORE_DB_MAXCONNS", "25")
+	t.Setenv("CORE_DB_MAXCONNLIFETIME", "2h")
 
 	cfg, err := LoadConfig()
 	require.NoError(t, err)
@@ -33,4 +43,6 @@ func TestLoadConfig_EnvOverrides(t *testing.T) {
 	assert.Equal(t, 9090, cfg.Port)
 	assert.Equal(t, "text", cfg.Logger.Format)
 	assert.Equal(t, "postgres://user:pass@host:5432/core?sslmode=disable", cfg.Db.ConnString)
+	assert.Equal(t, int32(25), cfg.Db.MaxConns)
+	assert.Equal(t, 2*time.Hour, cfg.Db.MaxConnLifetime)
 }

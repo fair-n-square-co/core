@@ -28,14 +28,10 @@ type Config struct {
 
 // LoadConfig resolves config in two passes into the same struct: embedded YAML
 // first, then environment variables (prefixed CORE_) which override the YAML.
+// Defaults live solely in the embedded YAML (config.yml / config.prod.yml) so
+// they are not duplicated in Go.
 func LoadConfig() (*Config, error) {
-	config := &Config{
-		Port: 8080,
-		Logger: logger.LogConfig{
-			Level:  slog.LevelInfo,
-			Format: "json",
-		},
-	}
+	config := &Config{}
 
 	if err := config.readViperConfig("yaml"); err != nil {
 		return nil, fmt.Errorf("config error: failed to read yaml config: %w", err)

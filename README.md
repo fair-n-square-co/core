@@ -70,12 +70,43 @@ first, then **environment variables** override it. Env vars use the `CORE_` pref
 |---------|---------|---------|
 | `CORE_PORT` | `Port` | `8080` |
 | `CORE_DB_CONNSTRING` | `Db.ConnString` | _(empty)_ |
+| `CORE_DB_MAXCONNS` | `Db.MaxConns` | `10` (`20` in prod) |
+| `CORE_DB_MINCONNS` | `Db.MinConns` | `2` (`5` in prod) |
+| `CORE_DB_MAXCONNLIFETIME` | `Db.MaxConnLifetime` | `1h` |
+| `CORE_DB_MAXCONNIDLETIME` | `Db.MaxConnIdleTime` | `30m` |
+| `CORE_DB_HEALTHCHECKPERIOD` | `Db.HealthCheckPeriod` | `1m` |
 | `CORE_LOGGER_FORMAT` | `Logger.Format` | `json` (or `text`) |
 | `CORE_LOGGER_LEVEL` | `Logger.Level` | `0` (slog Info) |
 | `CORE_ENV` | selects YAML file | `config.yml` |
 
 > The app reads `CORE_DB_CONNSTRING`. `just migrate-db` is a separate goose CLI and
 > still uses `DATABASE_URL`.
+
+## Database
+
+Core owns a **single Postgres database** (`fairnsquare_core`) and never joins across service
+boundaries: it talks only to its own DB and reaches the Auth service over RPC, honoring the
+ADR-2 boundary. The schema stays lean — our own ids plus external references and business data
+only, no auth or profile data (see the docs repo's ADRs).
+
+### Schema & query workflow
+
+- **Migrations** are goose SQL files in `db/core/migrations/`, each with a `+goose Up` and a
+  `+goose Down`. Generate a new one with `just migrate-gen` (it prints the `goose … create`
+  command); never hand-rename existing files. Apply them with `just migrate-db` (reads
+  `DATABASE_URL`).
+- **Queries** are hand-written sqlc SQL in `db/core/queries/`. After editing a query or
+  migration, run `just generate` to regenerate the typed Go in `internal/core/db/sqlc/` — those
+  files are generated, never hand-edited.
+
+### Connection pooling
+
+`internal/core/db.NewPool` opens a tuned `pgxpool` and pings it so a bad DSN fails fast at
+startup. The pool is wired through `config` (embedded YAML + `CORE_DB_*` env overrides) and
+injected into each module's `repository/`. Tunables — `MaxConns`, `MinConns`, `MaxConnLifetime`,
+`MaxConnIdleTime`, `HealthCheckPeriod` — come from the embedded config (see the table above),
+which is the single source of truth: the values are passed straight to pgx, and an invalid
+setting (e.g. `MaxConns < 1`) surfaces as a startup error rather than being silently corrected.
 
 ## Docker
 

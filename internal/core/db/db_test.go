@@ -17,3 +17,16 @@ func TestNewPool_InvalidURL(t *testing.T) {
 	require.Error(t, err)
 	assert.Nil(t, pool)
 }
+
+// TestNewPool_RejectsInvalidPoolConfig verifies that an invalid tuning value is
+// surfaced as an error rather than being silently corrected. MaxConns < 1 is
+// rejected by pgx before any connection is attempted, so this needs no live DB.
+func TestNewPool_RejectsInvalidPoolConfig(t *testing.T) {
+	pool, err := NewPool(context.Background(), DBConfig{
+		ConnString: "postgres://user:pass@localhost:5432/core",
+		MaxConns:   0,
+	})
+
+	require.Error(t, err)
+	assert.Nil(t, pool)
+}

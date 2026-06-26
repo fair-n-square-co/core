@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" database/sql driver for goose
 	"github.com/jackc/pgx/v5/pgtype"
+	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" database/sql driver for goose
 	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -58,7 +58,14 @@ func TestListFriends_RoundTrip(t *testing.T) {
 
 	runMigrations(t, dsn)
 
-	pool, err := coredb.NewPool(ctx, coredb.DBConfig{ConnString: dsn})
+	pool, err := coredb.NewPool(ctx, coredb.DBConfig{
+		ConnString:        dsn,
+		MaxConns:          10,
+		MinConns:          2,
+		MaxConnLifetime:   time.Hour,
+		MaxConnIdleTime:   30 * time.Minute,
+		HealthCheckPeriod: time.Minute,
+	})
 	require.NoError(t, err)
 	t.Cleanup(pool.Close)
 
