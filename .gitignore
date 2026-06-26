@@ -1,5 +1,7 @@
 # Build output
 /bin/
+# air hot-reload build artifacts
+/tmp/
 
 # Test/coverage artifacts
 cover.out

@@ -16,6 +16,16 @@ services:
       timeout: 30s
       retries: 3
 
+  migrate:
+    build:
+      context: .
+      target: migrate
+    environment:
+      CORE_DB_CONNSTRING: ${CORE_DB_CONNSTRING:?CORE_DB_CONNSTRING is required}
+    depends_on:
+      db:
+        condition: service_healthy
+
   app:
     build: .
     ports:
@@ -25,6 +35,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   db_data:
