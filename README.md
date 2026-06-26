@@ -104,8 +104,9 @@ only, no auth or profile data (see the docs repo's ADRs).
 `internal/core/db.NewPool` opens a tuned `pgxpool` and pings it so a bad DSN fails fast at
 startup. The pool is wired through `config` (embedded YAML + `CORE_DB_*` env overrides) and
 injected into each module's `repository/`. Tunables — `MaxConns`, `MinConns`, `MaxConnLifetime`,
-`MaxConnIdleTime`, `HealthCheckPeriod` — default from the embedded config (see the table above);
-any field left unset falls back to the pgx default.
+`MaxConnIdleTime`, `HealthCheckPeriod` — come from the embedded config (see the table above),
+which is the single source of truth: the values are passed straight to pgx, and an invalid
+setting (e.g. `MaxConns < 1`) surfaces as a startup error rather than being silently corrected.
 
 ## Docker
 
