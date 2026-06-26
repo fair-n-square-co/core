@@ -1,12 +1,37 @@
+# Load .env (POSTGRES_*, DATABASE_URL, ...) if present.
+set dotenv-load := true
+
+# Postgres credentials for local dev. Defaults let `just run` / `just docker-up`
+# work with zero config; override any of them via .env or the environment.
+# These are `export`ed so `docker compose` interpolation picks them up.
+export POSTGRES_USER := env_var_or_default("POSTGRES_USER", "postgres")
+export POSTGRES_PASSWORD := env_var_or_default("POSTGRES_PASSWORD", "postgres")
+export POSTGRES_DB := env_var_or_default("POSTGRES_DB", "core")
+
+# Connection string the app uses inside the compose network (host `db`).
+export CORE_DB_CONNSTRING := env_var_or_default("CORE_DB_CONNSTRING", "postgres://" + POSTGRES_USER + ":" + POSTGRES_PASSWORD + "@db:5432/" + POSTGRES_DB + "?sslmode=disable")
+
+# Connection string for the host machine talking to the compose Postgres
+# (published on 127.0.0.1:5432). Overridable via DATABASE_URL.
+local_db_url := env_var_or_default("DATABASE_URL", "postgres://" + POSTGRES_USER + ":" + POSTGRES_PASSWORD + "@localhost:5432/" + POSTGRES_DB + "?sslmode=disable")
+
 build:
     @echo "Building..."
     go build -o bin/core ./cmd/core
     @echo "Done."
 
-run: build
-    @echo "Running..."
-    ./bin/core
-    @echo "Done."
+# Start only the Postgres service (detached) and wait for it to be healthy.
+db:
+    @echo "Starting Postgres..."
+    docker compose up -d --wait db
+
+# Local dev: ensure the DB is up, run migrations, then run the app with
+# hot reload (air). Edits under ./cmd and ./internal rebuild automatically.
+run: db
+    @echo "Migrating database..."
+    goose -dir db/core/migrations postgres "{{local_db_url}}" up
+    @echo "Starting app with hot reload..."
+    CORE_DB_CONNSTRING="{{local_db_url}}" go tool air
 
 test:
     @echo "Running tests..."
@@ -39,7 +64,7 @@ migrate-gen:
 
 migrate-db:
     @echo "Migrating database..."
-    goose -dir db/core/migrations postgres "$DATABASE_URL" up
+    goose -dir db/core/migrations postgres "{{local_db_url}}" up
     @echo "Done."
 
 docker-build:
