@@ -5,8 +5,12 @@ name: Release images
 #   ghcr.io/fair-n-square-co/core/migrate   (goose runner)     <- Dockerfile.migrate
 #
 # Triggers:
-#   - push to main      -> :edge and :sha-<short> (unsigned-on-main is fine; these are dev builds)
-#   - push tag v*       -> :X.Y.Z, :X.Y, :latest (semver releases)
+#   - push to main         -> :edge and :sha-<short> (dev builds)
+#   - push tag v*          -> :X.Y.Z, :X.Y, :latest (semver releases)
+#   - manual dispatch      -> :X.Y.Z-alpha.<run> pre-release from any branch.
+#                             svu computes the next semver from conventional
+#                             commits; --always guarantees it's ahead of the
+#                             last release. Pre-releases never get :latest/:edge.
 #
 # Supply-chain controls per image: SBOM + SLSA build provenance (buildx),
 # Trivy HIGH/CRITICAL gate, cosign keyless signature, and a GitHub-native
@@ -16,6 +20,13 @@ on:
   push:
     branches: [main]
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Pre-release version bump (auto = derive from conventional commits)'
+        type: choice
+        options: [auto, patch, minor, major]
+        default: auto
 
 concurrency:
   group: release-${{ github.ref }}
@@ -25,7 +36,48 @@ permissions:
   contents: read
 
 jobs:
+  # Only runs for manual dispatch: derives the X.Y.Z-alpha.<run> pre-release tag.
+  version:
+    name: Compute pre-release tag
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    outputs:
+      tag: ${{ steps.svu.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0          # svu needs full history + tags
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install svu
+        run: go install github.com/caarlos0/svu/v3@v3.4.1
+
+      - name: Compute pre-release tag
+        id: svu
+        env:
+          BUMP: ${{ inputs.bump }}
+          PRE: alpha.${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          if [ "$BUMP" = "auto" ]; then
+            tag=$(svu next --always --prerelease "$PRE")
+          else
+            tag=$(svu "$BUMP" --prerelease "$PRE")
+          fi
+          echo "Computed pre-release tag: $tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: [version]
+    # Runs on push (version skipped) and on dispatch (version succeeded).
+    if: ${{ !cancelled() && needs.version.result != 'failure' }}
     name: Build & publish (${{ matrix.image.name }})
     runs-on: ubuntu-latest
     permissions:
@@ -73,6 +125,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=edge,branch=main
             type=sha
+            type=raw,value=${{ needs.version.outputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
 
       - name: Build and push
         id: build
