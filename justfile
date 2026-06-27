@@ -67,10 +67,24 @@ migrate-db:
     goose -dir db/core/migrations postgres "{{local_db_url}}" up
     @echo "Done."
 
-docker-build:
-    @echo "Building docker image..."
-    docker build -t core .
+docker-build: docker-build-core docker-build-migrate
+
+docker-build-core:
+    @echo "Building core image..."
+    docker build -f Dockerfile.core -t core .
     @echo "Done."
+
+docker-build-migrate:
+    @echo "Building migrate image..."
+    docker build -f Dockerfile.migrate -t core-migrate .
+    @echo "Done."
+
+# Verify a published image's cosign signature was produced by this repo's release workflow.
+# Usage: just cosign-verify ghcr.io/fair-n-square-co/core:1.2.3
+cosign-verify image:
+    cosign verify {{image}} \
+      --certificate-identity-regexp '^https://github.com/fair-n-square-co/core/' \
+      --certificate-oidc-issuer https://token.actions.githubusercontent.com
 
 docker-up:
     @echo "Starting services..."
