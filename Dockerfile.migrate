@@ -18,7 +18,7 @@ ARG GOOSE_VERSION=v3.27.1
 # Postgres-only, fully static (CGO off): drop the other drivers, including the
 # only CGO-dependent one (sqlite). -trimpath/-s -w keep the binary small.
 RUN CGO_ENABLED=0 go install -trimpath -ldflags="-s -w" \
-      -tags='no_sqlite no_clickhouse no_mssql no_mysql' \
+      -tags='no_sqlite3 no_clickhouse no_mssql no_mysql' \
       github.com/pressly/goose/v3/cmd/goose@${GOOSE_VERSION}
 
 # --- Runtime stage -----------------------------------------------------------

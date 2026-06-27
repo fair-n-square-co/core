@@ -83,7 +83,7 @@ docker-build-migrate:
 # Usage: just cosign-verify ghcr.io/fair-n-square-co/core:1.2.3
 cosign-verify image:
     cosign verify {{image}} \
-      --certificate-identity-regexp '^https://github.com/fair-n-square-co/core/' \
+      --certificate-identity-regexp '^https://github\.com/fair-n-square-co/core/\.github/workflows/release\.yml@refs/(heads|tags)/.+$' \
       --certificate-oidc-issuer https://token.actions.githubusercontent.com
 
 docker-up:
