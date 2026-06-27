@@ -77,7 +77,9 @@ jobs:
   build:
     needs: [version]
     # Runs on push (version skipped) and on dispatch (version succeeded).
-    if: ${{ !cancelled() && needs.version.result != 'failure' }}
+    # always() forces evaluation when `version` is skipped; the result guard
+    # still blocks the build if `version` actually failed.
+    if: ${{ always() && !cancelled() && needs.version.result != 'failure' }}
     name: Build & publish (${{ matrix.image.name }})
     runs-on: ubuntu-latest
     permissions:
@@ -123,7 +125,9 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=edge,branch=main
+            # edge is for main-branch pushes only; a manual prerelease run from
+            # main must never publish/overwrite it.
+            type=edge,branch=main,enable=${{ github.event_name != 'workflow_dispatch' }}
             type=sha
             type=raw,value=${{ needs.version.outputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
 
