@@ -1,0 +1,12 @@
+# zizmor configuration — https://docs.zizmor.sh/configuration/
+#
+# Our own org's reusable workflows (fair-n-square-co/*) are referenced by a
+# major-version tag (e.g. @v1), which moves forward with patch/minor releases.
+# That is safe for first-party code we control, so we allow a `ref-pin` there.
+# Everything third-party must still be pinned to a full commit SHA (`hash-pin`).
+rules:
+  unpinned-uses:
+    config:
+      policies:
+        "fair-n-square-co/*": ref-pin
+        "*": hash-pin

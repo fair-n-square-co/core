@@ -16,7 +16,7 @@ jobs:
   # Shared Go CI (lint, build+vet, test, govulncheck, integration) lives in the
   # org .github repo so every Go service doesn't re-implement it.
   go-ci:
-    uses: fair-n-square-co/.github/.github/workflows/go-ci.yml@c1e2693bc3c5164d2df3c6c3b6ebd5738f3a0c74 # main
+    uses: fair-n-square-co/.github/.github/workflows/go-ci.yml@v1
     with:
       run-integration: true
       integration-packages: ./cmd/core/...
