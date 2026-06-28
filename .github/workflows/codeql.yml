@@ -20,4 +20,4 @@ jobs:
       packages: read
       actions: read
       contents: read
-    uses: fair-n-square-co/.github/.github/workflows/codeql.yml@main
+    uses: fair-n-square-co/.github/.github/workflows/codeql.yml@c1e2693bc3c5164d2df3c6c3b6ebd5738f3a0c74 # main
