@@ -84,3 +84,47 @@ func TestRecoveryInterceptor_PassesThroughSuccess(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, resp)
 }
+
+// sanitize runs the error-sanitizer interceptor over a handler returning err and
+// reports the error a client would observe. (Twin cases live in auth/pkg/middleware.)
+func sanitize(t *testing.T, err error) error {
+	t.Helper()
+	next := connect.UnaryFunc(func(_ context.Context, _ connect.AnyRequest) (connect.AnyResponse, error) {
+		return nil, err
+	})
+	wrapped := NewErrorSanitizerInterceptor().WrapUnary(next)
+	_, got := wrapped(context.Background(), newReq())
+	return got
+}
+
+func TestErrorSanitizer_HidesServerFaults(t *testing.T) {
+	leaky := connect.NewError(connect.CodeInternal,
+		errors.New(`list friendships: ERROR: relation "friendships" does not exist`))
+
+	got := sanitize(t, leaky)
+
+	require.Error(t, got)
+	assert.Equal(t, connect.CodeInternal, connect.CodeOf(got))
+	assert.Equal(t, "internal: internal error", got.Error())
+	assert.NotContains(t, got.Error(), "friendships")
+}
+
+func TestErrorSanitizer_PassesClientFaultsThrough(t *testing.T) {
+	for _, code := range []connect.Code{
+		connect.CodeInvalidArgument,
+		connect.CodeAlreadyExists,
+		connect.CodeNotFound,
+		connect.CodeUnauthenticated,
+	} {
+		orig := connect.NewError(code, errors.New("missing X-User-Id header"))
+		got := sanitize(t, orig)
+
+		require.Error(t, got)
+		assert.Equal(t, code, connect.CodeOf(got))
+		assert.Contains(t, got.Error(), "missing X-User-Id header")
+	}
+}
+
+func TestErrorSanitizer_PassesSuccessThrough(t *testing.T) {
+	assert.NoError(t, sanitize(t, nil))
+}
