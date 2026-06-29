@@ -18,8 +18,8 @@ jobs:
     permissions:
       security-events: write # upload CodeQL results
       packages: read # fetch internal/private CodeQL packs
-      actions: read
-      contents: read
+      actions: read # read workflows for the actions-language analysis
+      contents: read # checkout the repository source
     strategy:
       fail-fast: false
       matrix:
