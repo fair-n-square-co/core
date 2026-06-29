@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/fair-n-square-co/core/internal/core/db/sqlc"
+	"github.com/fair-n-square-co/core/pkg/pgerr"
 )
 
 // Friendship is the repository-level view of a friendship row. Identifiers are
@@ -44,7 +45,10 @@ func (r *Repository) ListFriendshipsForUser(ctx context.Context, userID string) 
 		Status: pgtype.Text{}, // NULL -> no status filter
 	})
 	if err != nil {
-		return nil, fmt.Errorf("list friendships: %w", err)
+		// Classify at the repository boundary so callers can match domain-neutral
+		// sentinels (errors.Is pgerr.ErrNotFound, …) instead of raw pgx errors.
+		// Returns the error unchanged when it isn't a recognized database error.
+		return nil, fmt.Errorf("list friendships: %w", pgerr.Classify(err))
 	}
 
 	friendships := make([]Friendship, 0, len(rows))
